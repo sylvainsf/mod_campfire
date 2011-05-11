@@ -1,0 +1,9 @@
+Description: This ejabberd module manages connections to 37Signals Campfire service, listens for events in rooms and can take action accordingly. 
+Author: Sylvain Niles <sylvain.niles@gmail.com>
+Copyright: Cascadeo Corporation http://cascadeo.com/
+License: Creative Commons Attribution-ShareAlike CC BY-SA, please see http://creativecommons.org/licenses/by-sa/3.0/ for more info.
+
+Requires ibrowse (full) and mochijson.erl be installed:
+https://github.com/cmullaparthi/ibrowse
+https://github.com/mochi/mochiweb
+

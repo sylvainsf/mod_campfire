@@ -265,7 +265,7 @@ SMS:
 Example:
 .sms [jared] your pants are on fire
 
-[INACTIVE]
+[EXAMPLES]
 
 Zendesk
 ------------
@@ -283,58 +283,59 @@ Example:
 	Usage.
 
 process_macro(RID, Body, State) ->
-			RoomID = integer_to_list(RID),
-			case parse_macro(Body) of
-				".help" ->
-             			   	cf_sendmessage(RoomID, cf_create_message(cf_usage(), "PasteMessage"));
-              			".sms"  ->
-					% Test for Args
-					case string:chr(Body, $[) of
-						0 -> none;
-						_ ->
-                					User = parse_args(Body),
-                       					SmsMsg = parse_body(Body),
-                       					mod_sms:send_sms(User, SmsMsg),
-                       					cf_sendmessage(RoomID, cf_create_message(string:concat("SMS sent to ", User)))
-					end;
-       		        	_       ->
-					% traffic cop does his thing
-					C = mnesia:dirty_read(room_tracker, RoomID),
-					Co = tuple_to_list(lists:nth(1, C)),
-					[_, _, _, _, Counter, RoomName] = Co,
-					IT = mnesia:dirty_read(idler, RoomID),
-					?INFO_MSG("IT = ~p~n", [IT]),
-					IdT = tuple_to_list(lists:nth(1, IT)),
-					?INFO_MSG("IdT = ~p~n", [IdT]),
-					[_, _, {_, IdleTime, _}] = IdT,
-					?INFO_MSG("IdleTime = ~p~n", [IdleTime]),
-					{_, Now, _} = now(),
-					Diff = Now - IdleTime,
-					case Diff > 600 of
-					true ->
-					case Counter of 
-                				0 -> 	F = fun() ->
-								[{_, ORID, OSID, OSRV, Octr, OName}]  = mnesia:read(room_tracker, RoomID),
-								mnesia:write(#room_tracker{roomid = RoomID, streamid = OSID, server = OSRV, counter = 1, roomname = OName})
-							end,
-							mnesia:transaction(F),
-							% send cop message
-							O = mnesia:dirty_index_read(room_tracker, "Casc Operations", roomname),
-							Op = tuple_to_list(lists:nth(1, O)),
-							[_, OpsRoom, _, _, _, _] = Op,
-							?INFO_MSG("Roomname = ~p~n", [RoomName]),
-							case RoomID /= OpsRoom of
-								true -> cf_sendmessage(OpsRoom, cf_create_message(string:concat(string:concat("Activity observed in the ", RoomName), " room, someone there needs assistance."))),
-									timer:send_after(60000, {reset_counter, RoomID});
-								false -> none
-							end;
-						_ -> 	none
+	RoomID = integer_to_list(RID),
+	case parse_macro(Body) of
+		".help" ->
+             		cf_sendmessage(RoomID, cf_create_message(cf_usage(), "PasteMessage"));
+              	".sms"  ->
+		% Test for Args
+		case string:chr(Body, $[) of
+			0 -> none;
+			_ ->
+                	User = parse_args(Body),
+                       	SmsMsg = parse_body(Body),
+                       	mod_sms:send_sms(User, SmsMsg),
+                       	cf_sendmessage(RoomID, cf_create_message(string:concat("SMS sent to ", User)))
+			end;
+       		_       ->
+		% traffic cop does his thing
+		C = mnesia:dirty_read(room_tracker, RoomID),
+		Co = tuple_to_list(lists:nth(1, C)),
+		[_, _, _, _, Counter, RoomName] = Co,
+		IT = mnesia:dirty_read(idler, RoomID),
+		?INFO_MSG("IT = ~p~n", [IT]),
+		IdT = tuple_to_list(lists:nth(1, IT)),
+		[_, _, {_, IdleTime, _}] = IdT,
+		{_, Now, _} = now(),
+		Diff = Now - IdleTime,
+		% If ten minutes have passed since last activity in the room, notify the Operations room.
+		case Diff > 600 of
+			true ->
+				case Counter of 
+                			0 -> 	F = fun() ->
+					[{_, ORID, OSID, OSRV, Octr, OName}]  = mnesia:read(room_tracker, RoomID),
+					mnesia:write(#room_tracker{roomid = RoomID, streamid = OSID, server = OSRV, counter = 1, roomname = OName})
 					end,
-					mnesia:dirty_write(#idler{roomid = RoomID, idletime = now()});
-					false ->
-               				{noreply, State}
-					end
-			end.
+					mnesia:transaction(F),
+					% send cop message
+					% change "Operations to whatever room you'd like the notifications in."
+					O = mnesia:dirty_index_read(room_tracker, "Operations", roomname),
+					Op = tuple_to_list(lists:nth(1, O)),
+					[_, OpsRoom, _, _, _, _] = Op,
+					% Ignore the opsroom
+					case RoomID /= OpsRoom of
+						true -> 
+							cf_sendmessage(OpsRoom, cf_create_message(string:concat(string:concat("Activity observed in the ", RoomName), " room, someone there needs assistance."))),
+							timer:send_after(60000, {reset_counter, RoomID});
+						false -> none
+					end;
+						_ -> 	none
+				end,
+				mnesia:dirty_write(#idler{roomid = RoomID, idletime = now()});
+			false ->
+               			{noreply, State}
+		end
+end.
 
 
 parse_macro(Body) ->

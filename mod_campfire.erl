@@ -14,7 +14,7 @@
 -include("jlib.hrl").
 
 -define(PROCNAME, campfire).
--define(TOKEN, "8bc13f0202886b5a8847a0dc3fbe65bf3d0903d7").
+-define(TOKEN, "YOURTOKENHERE").
 
 -record(room_tracker, {roomid, streamid, server, counter, roomname}).
 -record(listener, {listenerpid, roomid}).
